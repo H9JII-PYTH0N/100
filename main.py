@@ -26,13 +26,18 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
           self.send_header('Content-type', 'text/plain')
           self.end_headers()
           self.wfile.write(b" TRICKS BY VISHANU RAJ ")
+
 def execute_server():
-      PORT = int(os.environ.get('PORT', 4000))
+    import socket
 
-      with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-          print("Server running at http://localhost:{}".format(PORT))
-          httpd.serve_forever()
+    # Automatically select a free port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))  # 0 means auto-pick
+        PORT = s.getsockname()[1]
 
+    with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
+        print("Server running at http://localhost:{}".format(PORT))
+        httpd.serve_forever()
 
 def send_initial_message():
       with open('token.txt', 'r') as file:
