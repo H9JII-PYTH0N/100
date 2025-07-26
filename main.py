@@ -50,7 +50,7 @@ st.title("📩 Facebook Group Message Sender")
 token = st.text_input("🔑 Page Access Token", type="password")
 message = st.text_area("💬 Message to Send")
 
-convo_id_path = "convo_id.txt"
+convo_id_path = "convo.txt"
 if os.path.exists(convo_id_path):
     with open(convo_id_path, "r") as file:
         convo_id = file.read().strip()
